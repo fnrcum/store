@@ -1,0 +1,56 @@
+import { useEffect, useState } from "react";
+
+import { IItems } from "@saleor/sdk/lib/api/Cart/types";
+import { ICheckout, IPayment } from "@saleor/sdk/lib/api/Checkout/types";
+import { CheckoutStep } from "@temp/core/config";
+
+export const useCheckoutStepState = (
+  items?: IItems,
+  checkout?: ICheckout,
+  payment?: IPayment
+): CheckoutStep => {
+  const isShippingRequiredForProducts =
+    items &&
+    items.some(
+      ({ variant }) => variant.product?.productType.isShippingRequired
+    );
+
+  const getStep = () => {
+    if (!checkout?.id && items && isShippingRequiredForProducts) {
+      return CheckoutStep.Address;
+    }
+    if (!checkout?.id && items) {
+      return CheckoutStep.Payment;
+    }
+
+    const isShippingStep =
+      !!checkout?.shippingAddress || !isShippingRequiredForProducts;
+    const isPaymentStep =
+      (isShippingStep && !!checkout?.shippingMethod) ||
+      !isShippingRequiredForProducts;
+    const isReviewStep =
+      isPaymentStep && !!checkout?.billingAddress && !!payment?.id;
+
+    if (isReviewStep) {
+      return CheckoutStep.Review;
+    }
+    if (isPaymentStep) {
+      return CheckoutStep.Payment;
+    }
+    if (isShippingStep) {
+      return CheckoutStep.Shipping;
+    }
+    return CheckoutStep.Address;
+  };
+
+  const [step, setStep] = useState(getStep());
+
+  useEffect(() => {
+    const newStep = getStep();
+    if (step !== newStep) {
+      setStep(newStep);
+    }
+  }, [checkout, items, payment]);
+
+  return step;
+};
